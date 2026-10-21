@@ -14,6 +14,12 @@ def normalize_actions(payload, symbol, observed_at, first, last):
     for kind, events in payload.items():
         if not events:
             continue
+        if kind == 'cash_mergers':
+            # Alpaca's symbol filter also matches acquiring companies. Paying
+            # cash for another issuer does not exchange the acquirer's shares.
+            if all(e.get('acquirer_symbol') == symbol and e.get('acquiree_symbol') not in (None, symbol) for e in events):
+                continue
+            raise ValueError('Cash merger affects held shares; redemption accounting is required')
         if kind not in ('forward_splits', 'cash_dividends'):
             raise ValueError(f'Unsupported corporate action category: {kind}; cannot assume correct share accounting')
         for event in events:
@@ -79,7 +85,7 @@ def fetch(symbol, start, root='data/snapshots', feed='sip'):
     if pd.Timestamp(bars.session.iloc[0]) > start:
         # A weekend/holiday start is valid; require first expected exchange session.
         from market_data import calendar
-        expected = calendar(start, last).sessions_in_range(start, last)[0]
+        expected = calendar(start, last).sessions[0]
         if pd.Timestamp(bars.session.iloc[0]) != pd.Timestamp(expected).tz_localize(None):
             raise ValueError('Requested starting history is incomplete')
     actions = normalize_actions(payload, symbol, observed, bars.session.iloc[0], bars.session.iloc[-1])
@@ -88,13 +94,13 @@ def fetch(symbol, start, root='data/snapshots', feed='sip'):
         bars.to_csv(bars_path, index=False)
         actions.to_csv(actions_path, index=False)
         return save_snapshot(bars_path, actions_path, root,
-                             f'Alpaca {feed} daily RAW bars and corporate-actions API; first observed on download; historical action completeness unverified', 'raw')
+                             f'Alpaca {feed} daily RAW bars and corporate-actions API; acquirer-only cash mergers excluded; first observed on download; historical action completeness unverified', 'raw')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--symbol', choices=['MSFT','AAPL'], default='MSFT')
-    parser.add_argument('--start', default='2016-01-01')
+    parser.add_argument('--start', default='2020-09-01', help='Earlier histories can contain missing dividend dates or unsupported due-bill events')
     parser.add_argument('--feed', choices=['sip','iex'], default='sip', help='IEX is a single-venue feed, not consolidated volume')
     parser.add_argument('--root', default='data/snapshots')
     args = parser.parse_args()

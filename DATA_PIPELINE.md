@@ -14,8 +14,8 @@ the environment as required by the UI; saved drafts do not apply runtime changes
 Never put credentials in source, commands, notebooks, reports or Git.
 
 ```bash
-python alpaca_ingest.py --symbol MSFT --start 2016-01-01
-python alpaca_ingest.py --symbol AAPL --start 2016-01-01
+python alpaca_ingest.py --symbol MSFT --start 2020-09-01
+python alpaca_ingest.py --symbol AAPL --start 2020-09-01
 ```
 
 The adapter only imports Alpaca historical-data clients. It requests RAW daily
@@ -32,6 +32,9 @@ corporate-action types fail closed. Forward splits and ordinary cash dividends
 are normalized. API failure is not permission to substitute empty action history.
 Corporate-action API historical coverage/completeness still needs validation
 against a second source before trusting historical trading results.
+Cash mergers returned solely because the requested symbol is the acquirer are
+excluded: those events do not exchange existing acquirer shares. Cash mergers
+affecting the held/acquired security remain blocked.
 
 Run once after each session's complete daily bar is available, before the next
 session open. Scheduling is deliberately not installed until real API access and
@@ -123,6 +126,7 @@ hash enforcement, corporate-action normalization, split wealth invariance,
 dividend entitlement/payment/cash constraints, costs/solvency, forward-signal
 freezing, and a raw research run on explicitly synthetic data. Alpaca SDK requests
 are checked with mocks, including RAW adjustment and unbounded action pagination.
-The live Alpaca download remains unverified until network access, secure keys,
-and API entitlements are supplied. Synthetic fixtures are never substituted for
-market data or used to claim strategy performance.
+Live SIP bars and corporate-action downloads passed on 2026-10-21; see
+[ALPACA_VALIDATION.md](ALPACA_VALIDATION.md) for exact coverage, results and limits.
+Synthetic fixtures are never substituted for market data or used to claim
+strategy performance.

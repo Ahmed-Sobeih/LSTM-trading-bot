@@ -81,7 +81,7 @@ class MarketDataTests(unittest.TestCase):
         def bars_response(request):
             self.assertEqual(request.adjustment, Adjustment.RAW)
             self.assertEqual(request.feed, DataFeed.SIP)
-            return SimpleNamespace(data={'MSFT':[SimpleNamespace(timestamp=pd.Timestamp('2024-03-15T04:00:00Z'),
+            return SimpleNamespace(data={'MSFT':[SimpleNamespace(timestamp=pd.Timestamp('2024-03-11T04:00:00Z'),
                 open=100.,high=101.,low=99.,close=100.,volume=1000)]})
         def actions_response(request):
             self.assertIsNone(request.limit)
@@ -90,11 +90,12 @@ class MarketDataTests(unittest.TestCase):
         with patch.dict('os.environ',{'APCA_API_KEY_ID':'test-only-key','APCA_API_SECRET_KEY':'test-only-secret'}), \
              patch('alpaca.data.historical.StockHistoricalDataClient') as stock, \
              patch('alpaca.data.historical.corporate_actions.CorporateActionsClient') as events, \
-             patch('alpaca_ingest.last_completed_session',return_value=pd.Timestamp('2024-03-15')), \
+             patch('alpaca_ingest.last_completed_session',return_value=pd.Timestamp('2024-03-11')), \
              patch('alpaca_ingest.save_snapshot',return_value=Path('synthetic-test-snapshot')) as save:
             stock.return_value.get_stock_bars.side_effect=bars_response
             events.return_value.get_corporate_actions.side_effect=actions_response
-            self.assertEqual(fetch('MSFT','2024-03-15'),Path('synthetic-test-snapshot'))
+            # Sunday start must resolve to Monday, not raise a calendar-bound error.
+            self.assertEqual(fetch('MSFT','2024-03-10'),Path('synthetic-test-snapshot'))
             save.assert_called_once()
 
     def test_split_preserves_wealth_and_return_features(self):
@@ -158,8 +159,22 @@ class MarketDataTests(unittest.TestCase):
         result = normalize_actions(payload,'TEST',OBSERVED,'2024-01-01','2024-03-15')
         self.assertEqual(result.split_ratio.iloc[0], 4.)
         self.assertEqual(result.cash_per_share.iloc[1], .25)
+        self.assertTrue(normalize_actions({'cash_mergers':[{'acquirer_symbol':'TEST','acquiree_symbol':'OTHER'}]},
+                                         'TEST',OBSERVED,'2024-01-01','2024-03-15').empty)
+        with self.assertRaisesRegex(ValueError,'affects held shares'):
+            normalize_actions({'cash_mergers':[{'acquirer_symbol':'OTHER','acquiree_symbol':'TEST'}]},
+                              'TEST',OBSERVED,'2024-01-01','2024-03-15')
         with self.assertRaisesRegex(ValueError,'Unsupported'):
             normalize_actions({'spin_offs':[{}]},'TEST',OBSERVED,'2024-01-01','2024-03-15')
+
+    def test_missing_payment_dates_and_due_bills_still_rejected(self):
+        missing = {'cash_dividends':[dict(id='a',symbol='TEST',ex_date='2024-03-01',rate=.25)]}
+        with self.assertRaisesRegex(ValueError, 'payment date missing'):
+            normalize_actions(missing,'TEST',OBSERVED,'2024-01-01','2024-03-15')
+        due_bill = {'forward_splits':[dict(id='a',symbol='TEST',ex_date='2024-03-01',
+                    old_rate=1,new_rate=4,due_bill_redemption_date='2024-03-04')]}
+        with self.assertRaisesRegex(ValueError, 'Due-bill'):
+            normalize_actions(due_bill,'TEST',OBSERVED,'2024-01-01','2024-03-15')
 
     def test_freeze_prospective_signal_once_and_reject_late_execution(self):
         bars, actions = validate(*fixture(), OBSERVED)

@@ -76,3 +76,8 @@ Next: collect a new snapshot after each completed session, preserve the frozen
 decisions, and evaluate subsequent realized outcomes without retuning past records.
 Automated scheduling and broker execution have not been installed. Snapshot and
 decision files need separate durable backup because Git intentionally excludes them.
+
+The next stage adds `daily.py` and `forward_score.py`; see
+[DAILY_RESEARCH.md](DAILY_RESEARCH.md). The first real repeat cycle preserved both
+decisions and reported two pending outcomes with no errors. No performance result
+has yet been claimed for these forward forecasts.

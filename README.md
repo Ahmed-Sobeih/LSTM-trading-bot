@@ -108,3 +108,8 @@ and a forward signal recorder. Those components preserve the original CSVs and
 require a separate verified raw data source. Current Alpaca data needs secure API
 keys, allowed network access and appropriate feed/action entitlements. No orders
 are placed by these tools.
+
+For a repeatable collection/forecast/scoring cycle, run `bash scripts/run_daily.sh`.
+See [DAILY_RESEARCH.md](DAILY_RESEARCH.md) for outcome timing, immutable-by-API
+records, error handling and durable scheduling requirements. This cloud workspace
+does not run an unattended daily job merely because the command is available.

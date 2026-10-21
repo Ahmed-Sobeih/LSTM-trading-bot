@@ -5,5 +5,8 @@ __pycache__/
 reports/
 data/snapshots/
 data/decisions/
+data/outcomes/
+data/runs/
+data/.daily.lock
 .env
 .env.*

@@ -99,3 +99,12 @@ paper orders, idempotent client order IDs, persistent order/position reconciliat
 alerts and an operator-controlled kill switch. Live deployment additionally needs
 explicit account authorization and capital/risk limits. No broker credentials or
 real funds are used by this research pipeline.
+
+## Raw data, corporate actions and forward observations
+
+See [DATA_PIPELINE.md](DATA_PIPELINE.md) for the read-only Alpaca adapter, immutable
+observations with availability checks, raw-share cash/dividend/split accounting,
+and a forward signal recorder. Those components preserve the original CSVs and
+require a separate verified raw data source. Current Alpaca data needs secure API
+keys, allowed network access and appropriate feed/action entitlements. No orders
+are placed by these tools.

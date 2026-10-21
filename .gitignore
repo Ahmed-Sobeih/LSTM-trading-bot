@@ -3,3 +3,7 @@ __pycache__/
 .venv/
 *.executed.ipynb
 reports/
+data/snapshots/
+data/decisions/
+.env
+.env.*

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from accounting import raw_samples, simulate
-from alpaca_ingest import normalize_actions
+from alpaca_ingest import delayed_sip_end, normalize_actions
 from market_data import ACTION_COLUMNS, calendar, last_completed_session, read_snapshot, save_snapshot, validate
 from prospective import record_signal
 from research import Config
@@ -29,6 +29,10 @@ def fixture():
 
 
 class MarketDataTests(unittest.TestCase):
+    def test_sip_end_is_capped_after_close_and_before_open(self):
+        self.assertEqual(delayed_sip_end('2026-10-22','2026-10-22T23:21:00Z'),pd.Timestamp('2026-10-22T23:05:00Z'))
+        self.assertEqual(delayed_sip_end('2026-10-22','2026-10-23T10:00:00Z'),pd.Timestamp('2026-10-23T04:00:00Z'))
+
     def test_exchange_holidays_and_stale_data(self):
         self.assertEqual(last_completed_session('2024-03-30T00:00:00Z'), pd.Timestamp('2024-03-28'))
         bars, actions = fixture()
@@ -81,6 +85,10 @@ class MarketDataTests(unittest.TestCase):
         def bars_response(request):
             self.assertEqual(request.adjustment, Adjustment.RAW)
             self.assertEqual(request.feed, DataFeed.SIP)
+            request_end = pd.Timestamp(request.end)
+            if request_end.tzinfo is None:  # Alpaca SDK stores request bounds as UTC-naive.
+                request_end = request_end.tz_localize('UTC')
+            self.assertLessEqual(request_end,pd.Timestamp.now(tz='UTC')-pd.Timedelta(minutes=15))
             return SimpleNamespace(data={'MSFT':[SimpleNamespace(timestamp=pd.Timestamp('2024-03-11T04:00:00Z'),
                 open=100.,high=101.,low=99.,close=100.,volume=1000)]})
         def actions_response(request):

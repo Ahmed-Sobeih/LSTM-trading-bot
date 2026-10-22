@@ -9,6 +9,12 @@ import pandas as pd
 from market_data import ACTION_COLUMNS, BAR_COLUMNS, last_completed_session, save_snapshot, utc
 
 
+def delayed_sip_end(last_session, now):
+    """Do not query future/recent minutes even when requesting complete daily bars."""
+    following_midnight = (pd.Timestamp(last_session)+pd.Timedelta(days=1)).tz_localize('America/New_York').tz_convert('UTC')
+    return min(following_midnight, utc(now)-pd.Timedelta(minutes=16))
+
+
 def normalize_actions(payload, symbol, observed_at, first, last):
     rows = []
     for kind, events in payload.items():
@@ -66,7 +72,7 @@ def fetch(symbol, start, root='data/snapshots', feed='sip'):
     client = StockHistoricalDataClient(key, secret)
     result = client.get_stock_bars(StockBarsRequest(symbol_or_symbols=symbol, timeframe=TimeFrame.Day,
         adjustment=Adjustment.RAW, feed=DataFeed(feed), start=start.tz_localize('America/New_York').to_pydatetime(),
-        end=(last+pd.Timedelta(days=1)).tz_localize('America/New_York').to_pydatetime()))
+        end=delayed_sip_end(last,now).to_pydatetime()))
     if symbol not in result.data or not result.data[symbol]:
         raise ValueError('Alpaca returned no bars; check symbol, dates and feed entitlement')
     actions_client = CorporateActionsClient(key, secret, raw_data=True)

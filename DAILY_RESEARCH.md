@@ -93,3 +93,27 @@ The first real repeat run reused both accepted snapshots and preserved both
 is 2026-10-22. With full daily bars and the publication buffer, the earliest expected
 scoring time is October 22 around 23:16 Africa/Cairo, subject to provider latency.
 Do not fabricate earlier results from synthetic tests or from incomplete daily bars.
+
+## First observed outcomes — October 23, 2026 (Africa/Cairo)
+
+The cycle downloaded completed October 22 data and scored the original October 20
+decisions for the October 21 open to October 22 open horizon:
+
+| Asset | Frozen predicted return | Observed return | Absolute error |
+|---|---:|---:|---:|
+| AAPL | +0.0880% | +1.6443% | 1.5563 percentage points |
+| MSFT | +0.1162% | +0.6989% | 0.5826 percentage points |
+
+Each model forecast was closer than a zero-return forecast on this single outcome,
+but materially understated the move. One observation per asset does not establish
+an edge. No orders were placed; these are forecast outcomes, not realized profits.
+The first outcome files are preserved under data/outcomes/ with input hashes.
+
+The same cycle froze October 22 decisions before the October 23 open. Their exit
+session is October 26 (the weekend intervenes). It did not backfill a missing
+October 21 decision: no unattended scheduler had run that session's collection.
+
+The live request exposed a delayed-SIP boundary bug: requesting through the next
+midnight after today's close included future/recent minutes and triggered Alpaca's
+subscription restriction. Requests now cap the end at the earlier of that midnight
+and current time minus 16 minutes; the complete daily bars were then accepted.

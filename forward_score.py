@@ -40,7 +40,12 @@ def verify_decision(path):
     if record.get('schema_version') != 1:
         raise ValueError('Unsupported decision schema')
     decision, execution = utc(record['decision_at']), utc(record['execution_open'])
-    bars, _, manifest = read_snapshot(record['snapshot'], decision)
+    snapshot_path = Path(record['snapshot'])
+    if not snapshot_path.exists():
+        # State can be restored on a different host. Preserve frozen JSON bytes;
+        # resolve the same snapshot ID beside the decisions and verify its hashes.
+        snapshot_path = Path(path).parent.parent/'snapshots'/snapshot_path.name
+    bars, _, manifest = read_snapshot(snapshot_path, decision)
     signal = pd.Timestamp(record['signal_session'])
     if (manifest['symbol'] != record['symbol'] or bars.session.iloc[-1] != signal or
             manifest['sha256'] != record['snapshot_sha256'] or

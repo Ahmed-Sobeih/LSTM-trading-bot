@@ -28,11 +28,12 @@ def bars_through(end):
 
 
 def snapshot(root, bars, actions, observed, suffix):
-    path = root/'snapshots'/f'{suffix}-TEST'
+    symbol=str(bars.symbol.iloc[0])
+    path = root/'snapshots'/f'{suffix}-{symbol}'
     path.mkdir(parents=True)
     bars.to_csv(path/'bars.csv',index=False)
     actions.to_csv(path/'actions.csv',index=False)
-    manifest = {'schema_version':1,'observed_at':observed,'symbol':'TEST','source':'Alpaca sip daily RAW synthetic test only',
+    manifest = {'schema_version':1,'observed_at':observed,'symbol':symbol,'source':'Alpaca sip daily RAW synthetic test only',
                 'price_basis':'raw','sha256':{name:digest(path/name) for name in ['bars.csv','actions.csv']}}
     (path/'manifest.json').write_text(json.dumps(manifest))
     return path

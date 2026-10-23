@@ -113,3 +113,12 @@ For a repeatable collection/forecast/scoring cycle, run `bash scripts/run_daily.
 See [DAILY_RESEARCH.md](DAILY_RESEARCH.md) for outcome timing, immutable-by-API
 records, error handling and durable scheduling requirements. This cloud workspace
 does not run an unattended daily job merely because the command is available.
+
+For backups, health alerts and the prepared GitHub Actions/private-S3 deployment,
+see [OPERATIONS.md](OPERATIONS.md). Hosted automation is gated off until private
+storage/OIDC, repository secrets and existing-state seeding are configured.
+
+For isolated historical candidate research, install requirements-research.txt,
+then run candidate_research.py with --snapshot, a new --out directory, and optionally
+--include-lstm. This compares ridge, gradient boosting and return-based LSTMs across
+three seeds without modifying forward decisions or using 2026 holdout performance.

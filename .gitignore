@@ -10,3 +10,5 @@ data/runs/
 data/.daily.lock
 .env
 .env.*
+backups/
+data/.remote-pointer.json

@@ -1,0 +1,102 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Private encrypted/versioned research backups and branch-scoped GitHub OIDC. No trading resources.",
+  "Parameters": {
+    "Repository": {"Type": "String", "Default": "Ahmed-Sobeih/LSTM-trading-bot"},
+    "Branch": {"Type": "String", "Default": "main"},
+    "ExistingStateBucketName": {"Type": "String", "Default": ""},
+    "ExistingGitHubOidcProviderArn": {"Type": "String", "Default": ""}
+  },
+  "Conditions": {
+    "CreateBucket": {"Fn::Equals": [{"Ref": "ExistingStateBucketName"}, ""]},
+    "CreateOidcProvider": {"Fn::Equals": [{"Ref": "ExistingGitHubOidcProviderArn"}, ""]}
+  },
+  "Resources": {
+    "GitHubOidcProvider": {
+      "Type": "AWS::IAM::OIDCProvider",
+      "Condition": "CreateOidcProvider",
+      "Properties": {
+        "Url": "https://token.actions.githubusercontent.com",
+        "ClientIdList": ["sts.amazonaws.com"]
+      }
+    },
+    "StateBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Condition": "CreateBucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "OwnershipControls": {"Rules": [{"ObjectOwnership": "BucketOwnerEnforced"}]},
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true, "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true, "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {"ServerSideEncryptionConfiguration": [{"ServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]},
+        "VersioningConfiguration": {"Status": "Enabled"},
+        "LifecycleConfiguration": {"Rules": [{"Id": "AbortIncompleteUploads", "Status": "Enabled", "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 7}}]}
+      }
+    },
+    "StateBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Condition": "CreateBucket",
+      "Properties": {
+        "Bucket": {"Ref": "StateBucket"},
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny", "Principal": "*", "Action": "s3:*",
+              "Resource": [{"Fn::GetAtt": ["StateBucket", "Arn"]}, {"Fn::Sub": "${StateBucket.Arn}/*"}],
+              "Condition": {"Bool": {"aws:SecureTransport": "false"}}
+            },
+            {
+              "Effect": "Deny", "Principal": "*", "Action": "s3:PutObject",
+              "Resource": {"Fn::Sub": "${StateBucket.Arn}/*"},
+              "Condition": {"StringNotEquals": {"s3:x-amz-server-side-encryption": "AES256"}}
+            }
+          ]
+        }
+      }
+    },
+    "ResearchRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Federated": {"Fn::If": ["CreateOidcProvider", {"Ref": "GitHubOidcProvider"}, {"Ref": "ExistingGitHubOidcProviderArn"}]}},
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {"StringEquals": {
+              "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+              "token.actions.githubusercontent.com:sub": {"Fn::Sub": "repo:${Repository}:ref:refs/heads/${Branch}"}
+            }}
+          }]
+        },
+        "Policies": [{
+          "PolicyName": "PrivateResearchState",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["s3:ListBucket", "s3:GetBucketPublicAccessBlock", "s3:GetBucketVersioning", "s3:GetEncryptionConfiguration"],
+                "Resource": {"Fn::If": ["CreateBucket", {"Fn::GetAtt": ["StateBucket", "Arn"]}, {"Fn::Sub": "arn:${AWS::Partition}:s3:::${ExistingStateBucketName}"}]}
+              },
+              {
+                "Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject"],
+                "Resource": {"Fn::If": ["CreateBucket", {"Fn::Sub": "${StateBucket.Arn}/research/*"}, {"Fn::Sub": "arn:${AWS::Partition}:s3:::${ExistingStateBucketName}/research/*"}]}
+              }
+            ]
+          }
+        }]
+      }
+    }
+  },
+  "Outputs": {
+    "StateBucketName": {"Value": {"Fn::If": ["CreateBucket", {"Ref": "StateBucket"}, {"Ref": "ExistingStateBucketName"}]}},
+    "ResearchRoleArn": {"Value": {"Fn::GetAtt": ["ResearchRole", "Arn"]}},
+    "Region": {"Value": {"Ref": "AWS::Region"}}
+  }
+}
